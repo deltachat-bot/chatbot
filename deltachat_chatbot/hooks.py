@@ -5,6 +5,7 @@ import json
 import logging
 import os
 from argparse import Namespace
+from typing import List, Tuple
 
 import openai
 import tiktoken
@@ -67,10 +68,12 @@ async def _filter_messages(event: AttrDict) -> None:
     if chat.chat_type != const.ChatType.SINGLE or not msg.text:
         return
 
+    messages = await _get_messages(msg)
     max_tokens = int(cfg["openai"].get("max_tokens") or 0)
-    enc = tiktoken.encoding_for_model(cfg["openai"].get("model"))
-    prompt_tokens = max_tokens and len(enc.encode(msg.text))
-    if prompt_tokens > max_tokens // 2:
+    if max_tokens:
+        messages, prompt_tokens = _apply_limit(messages, max_tokens)
+
+    if not messages:
         await msg.chat.send_message(text="TL;DR", quoted_msg=msg.id)
     else:
         global_quota_exceeded = await quota_manager.global_quota_exceeded()
@@ -97,7 +100,7 @@ async def _filter_messages(event: AttrDict) -> None:
 
         try:
             reply = await get_reply(
-                str(msg.from_id), msg.text, max_tokens - prompt_tokens
+                str(msg.from_id), messages, max_tokens - prompt_tokens
             )
             await quota_manager.increase_usage(msg.from_id, reply.usage.total_tokens)
             text = reply.choices[0].message.content.strip()
@@ -105,3 +108,33 @@ async def _filter_messages(event: AttrDict) -> None:
             await asyncio.sleep(1)  # avoid rate limits
         except openai.error.RateLimitError:
             quota_manager.set_rate_limit(60)
+
+
+async def _get_messages(msg: AttrDict) -> List[dict]:
+    account = msg.message.account
+    messages = []
+    if msg.quote and msg.quote.get("message_id"):
+        quote = await account.get_message_by_id(msg.quote.message_id)
+        snapshot = quote.get_snapshot()
+        if snapshot.text:
+            if snapshot.sender == account.self_contact:
+                role = "assistant"
+            else:
+                role = "user"
+            messages.append({"role": role, "content": snapshot.text})
+    messages.append({"role": "user", "content": msg.text})
+    return messages
+
+
+def _apply_limit(messages: List[dict], max_tokens: int) -> Tuple[List[dict], int]:
+    enc = tiktoken.encoding_for_model(cfg["openai"].get("model"))
+    prompt_tokens = 0
+    msgs: List[dict] = []
+    for message in reversed(messages):
+        tokens = len(enc.encode(message["content"]))
+        if prompt_tokens + tokens <= max_tokens // 2:
+            prompt_tokens += tokens
+            msgs.insert(0, message)
+        else:
+            break
+    return msgs, prompt_tokens
