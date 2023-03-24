@@ -23,6 +23,7 @@ dynamic = [
 dependencies = [
     "SQLAlchemy>=1.4.44",
     "aiosqlite>=0.17.0",
+    "openai>=0.27.2",
     "tiktoken>=0.3.2",
     "deltabot-cli @ git+https://github.com/deltachat-bot/deltabot-cli-py.git",
 ]
