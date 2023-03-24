@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deltachat-chatbot"
+description = "Conversational chat-bot for Delta Chat"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {file = "LICENSE.txt"}
+keywords = ["deltachat", "bot"]
+authors = [
+  {email = "adbenitez@hispanilandia.net"},
+  {name = "adbenitez"}
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python"
+]
+dynamic = [
+    "version"
+]
+dependencies = [
+    "SQLAlchemy>=1.4.44",
+    "aiosqlite>=0.17.0",
+    "tiktoken>=0.3.2",
+    "deltabot-cli @ git+https://github.com/deltachat-bot/deltabot-cli-py.git",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black",
+  "mypy",
+  "isort",
+  "pylint",
+  "pylama",
+  "pytest",
+]
+
+[project.scripts]
+chatbot = "deltachat_chatbot:main"
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+ignore_missing_imports = "True"
