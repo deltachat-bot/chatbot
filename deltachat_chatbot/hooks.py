@@ -114,8 +114,8 @@ async def _get_messages(msg: AttrDict) -> List[dict]:
     account = msg.message.account
     messages = []
     if msg.quote and msg.quote.get("message_id"):
-        quote = await account.get_message_by_id(msg.quote.message_id)
-        snapshot = quote.get_snapshot()
+        quote = account.get_message_by_id(msg.quote.message_id)
+        snapshot = await quote.get_snapshot()
         if snapshot.text:
             if snapshot.sender == account.self_contact:
                 role = "assistant"
