@@ -35,7 +35,7 @@ async def _on_start(bot: Bot, args: Namespace) -> None:
     if os.path.exists(path):
         with open(path, encoding="utf-8") as config:
             cfg.update(json.load(config))
-    cfg["openai"] = {"model": "gpt-3.5-turbo", "n": 1}.update(cfg.get("openai") or {})
+    cfg["openai"] = {"model": "gpt-3.5-turbo", "n": 1, **(cfg.get("openai") or {})}
     api_key = cfg.get("api_key", "")
     assert api_key, "API key is not set"
     await init_openai(api_key, cfg["openai"])
