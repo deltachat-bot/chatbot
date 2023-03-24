@@ -33,7 +33,6 @@ Create a configuration file named `config.json` in the program folder, for examp
   "global_monthly_quota": 10000000,
   "user_hourly_tokens_quota": 4000,
   "user_hourly_queries_quota": 60,
-  "max_prompt_tokens": 200,
   "openai": {
     "model": "gpt-3.5-turbo",
     "max_tokens": 500

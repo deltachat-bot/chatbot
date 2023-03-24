@@ -11,9 +11,12 @@ async def init_openai(api_key: str, config: dict) -> None:
     openai.api_key = api_key
 
 
-async def get_reply(user: str, text: str) -> OpenAIObject:
+async def get_reply(user: str, text: str, max_tokens: int) -> OpenAIObject:
+    kwargs = _cfg.copy()
+    if max_tokens:
+        kwargs["max_tokens"] = max_tokens
     return await openai.ChatCompletion.acreate(
-        **_cfg,
+        **kwargs,
         user=user,
         messages=[{"role": "user", "content": text}],
     )

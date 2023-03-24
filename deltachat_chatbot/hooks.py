@@ -67,9 +67,10 @@ async def _filter_messages(event: AttrDict) -> None:
     if chat.chat_type != const.ChatType.SINGLE or not msg.text:
         return
 
-    max_prompt_tokens = int(cfg.get("max_prompt_tokens") or 0)
+    max_tokens = int(cfg["openai"].get("max_tokens") or 0)
     enc = tiktoken.encoding_for_model(cfg["openai"].get("model"))
-    if max_prompt_tokens and len(enc.encode(msg.text)) > max_prompt_tokens:
+    prompt_tokens = max_tokens and len(enc.encode(msg.text))
+    if prompt_tokens > max_tokens // 2:
         await msg.chat.send_message(text="TL;DR", quoted_msg=msg.id)
     else:
         global_quota_exceeded = await quota_manager.global_quota_exceeded()
@@ -95,7 +96,9 @@ async def _filter_messages(event: AttrDict) -> None:
             return
 
         try:
-            reply = await get_reply(str(msg.from_id), msg.text)
+            reply = await get_reply(
+                str(msg.from_id), msg.text, max_tokens - prompt_tokens
+            )
             await quota_manager.increase_usage(msg.from_id, reply.usage.total_tokens)
             text = reply.choices[0].message.content.strip()
             await msg.chat.send_message(text=text, quoted_msg=msg.id)
