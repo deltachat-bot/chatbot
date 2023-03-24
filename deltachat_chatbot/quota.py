@@ -26,9 +26,9 @@ class QuotaManager:
                 self._rate_limit = 0
             if next_month <= time.time():
                 async with self._lock:
-                    self._cli.set_custom_config("used_tokens", 0)
+                    self._cli.set_custom_config("used_tokens", "0")
                 next_month = _get_next_month_timestamp()
-                await self._cli.set_custom_config("next_month", next_month)
+                await self._cli.set_custom_config("next_month", str(next_month))
 
             async with async_session() as session:
                 async with session.begin():
@@ -40,7 +40,7 @@ class QuotaManager:
         # increase global usage
         async with self._lock:
             used_tokens = int(await self._cli.get_custom_config("used_tokens") or 0)
-            self._cli.set_custom_config("used_tokens", used_tokens + tokens)
+            self._cli.set_custom_config("used_tokens", str(used_tokens + tokens))
 
         # increase user usage
         async with async_session() as session:
