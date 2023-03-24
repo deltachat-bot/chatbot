@@ -40,7 +40,7 @@ class QuotaManager:
         # increase global usage
         async with self._lock:
             used_tokens = int(await self._cli.get_custom_config("used_tokens") or 0)
-            self._cli.set_custom_config("used_tokens", str(used_tokens + tokens))
+            await self._cli.set_custom_config("used_tokens", str(used_tokens + tokens))
 
         # increase user usage
         async with async_session() as session:
