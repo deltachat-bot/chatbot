@@ -64,7 +64,8 @@ async def log_event(event: AttrDict) -> None:
 @cli.on(events.MemberListChanged(added=True))
 async def _member_added(event: AttrDict) -> None:
     msg = event.message_snapshot
-    if event.member == await msg.account.get_config("configured_addr"):
+    account = msg.message.account
+    if event.member == await account.get_config("configured_addr"):
         await msg.chat.send_text("👋")
 
 
