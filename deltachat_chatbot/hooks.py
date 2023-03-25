@@ -133,15 +133,17 @@ async def _filter_messages(event: AttrDict) -> None:
 async def _get_messages(msg: AttrDict) -> List[dict]:
     account = msg.message.account
     messages = []
-    if msg.quote and msg.quote.get("message_id"):
-        quote = account.get_message_by_id(msg.quote.message_id)
-        snapshot = await quote.get_snapshot()
-        if snapshot.text:
+    if msg.quote and msg.quote.text:
+        if msg.quote.get("message_id"):
+            quote = account.get_message_by_id(msg.quote.message_id)
+            snapshot = await quote.get_snapshot()
             if snapshot.sender == account.self_contact:
                 role = "assistant"
             else:
                 role = "user"
-            messages.append({"role": role, "content": snapshot.text})
+            messages.append({"role": role, "content": msg.quote.text})
+        else:
+            messages.append({"role": "user", "content": msg.quote.text})
     messages.append({"role": "user", "content": msg.text})
     return messages
 
