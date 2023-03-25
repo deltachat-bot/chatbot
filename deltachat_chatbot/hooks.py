@@ -72,21 +72,9 @@ async def _member_added(event: AttrDict) -> None:
 @cli.on(events.NewMessage(is_info=False, func=cli.is_not_known_command))
 async def _filter_messages(event: AttrDict) -> None:
     msg = event.message_snapshot
-    account = msg.message.account
     chat = await msg.chat.get_basic_snapshot()
-    if not msg.text:
+    if not msg.text or not await _should_reply(msg, chat):
         return
-    selfaddr = await account.get_config("configured_addr")
-    displayname = await account.get_config("displayname")
-    mention = selfaddr in msg.text or (displayname and f"@{displayname}" in msg.text)
-    if chat.chat_type != const.ChatType.SINGLE and not mention:
-        if msg.quote and msg.quote.get("message_id"):
-            quote = account.get_message_by_id(msg.quote.message_id)
-            snapshot = await quote.get_snapshot()
-            if snapshot.sender != account.self_contact:
-                return
-        else:
-            return
 
     messages = await _get_messages(msg)
     max_tokens = int(cfg["openai"].get("max_tokens") or 0)
@@ -160,3 +148,25 @@ def _apply_limit(messages: List[dict], max_tokens: int) -> Tuple[List[dict], int
         else:
             break
     return msgs, prompt_tokens
+
+
+async def _should_reply(msg: AttrDict, chat: AttrDict) -> bool:
+    # 1:1 direct chat
+    if chat.chat_type == const.ChatType.SINGLE:
+        return True
+
+    # mentions
+    account = msg.message.account
+    selfaddr = await account.get_config("configured_addr")
+    displayname = await account.get_config("displayname")
+    if selfaddr in msg.text or (displayname and f"@{displayname}" in msg.text):
+        return True
+
+    # quote-reply
+    if msg.quote and msg.quote.get("message_id"):
+        quote = account.get_message_by_id(msg.quote.message_id)
+        snapshot = await quote.get_snapshot()
+        if snapshot.sender == account.self_contact:
+            return True
+
+    return False
