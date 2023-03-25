@@ -63,22 +63,24 @@ async def log_event(event: AttrDict) -> None:
 
 @cli.on(events.MemberListChanged(added=True))
 async def _member_added(event: AttrDict) -> None:
-    if event.member == await event.account.get_config("configured_addr"):
-        await event.message_snapshot.chat.send_text("👋")
+    msg = event.message_snapshot
+    if event.member == await msg.account.get_config("configured_addr"):
+        await msg.chat.send_text("👋")
 
 
 @cli.on(events.NewMessage(is_info=False, func=cli.is_not_known_command))
 async def _filter_messages(event: AttrDict) -> None:
     msg = event.message_snapshot
+    account = msg.message.account
     chat = await msg.chat.get_basic_snapshot()
     if not msg.text:
         return
-    selfaddr = await event.account.get_config("configured_addr")
+    selfaddr = await account.get_config("configured_addr")
     if chat.chat_type != const.ChatType.SINGLE and selfaddr not in msg.text:
         if msg.quote and msg.quote.get("message_id"):
-            quote = event.account.get_message_by_id(msg.quote.message_id)
+            quote = account.get_message_by_id(msg.quote.message_id)
             snapshot = await quote.get_snapshot()
-            if snapshot.sender != event.account.self_contact:
+            if snapshot.sender != account.self_contact:
                 return
         else:
             return
