@@ -77,7 +77,9 @@ async def _filter_messages(event: AttrDict) -> None:
     if not msg.text:
         return
     selfaddr = await account.get_config("configured_addr")
-    if chat.chat_type != const.ChatType.SINGLE and selfaddr not in msg.text:
+    displayname = await account.get_config("displayname")
+    mention = selfaddr in msg.text or (displayname and f"@{displayname}" in msg.text)
+    if chat.chat_type != const.ChatType.SINGLE and not mention:
         if msg.quote and msg.quote.get("message_id"):
             quote = account.get_message_by_id(msg.quote.message_id)
             snapshot = await quote.get_snapshot()
