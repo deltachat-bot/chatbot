@@ -69,7 +69,7 @@ async def _member_added(event: AttrDict) -> None:
         await msg.chat.send_text("👋")
 
 
-@cli.on(events.NewMessage(is_info=False, func=cli.is_not_known_command))
+@cli.on(events.NewMessage(is_info=False, is_bot=None, func=cli.is_not_known_command))
 async def _filter_messages(event: AttrDict) -> None:
     msg = event.message_snapshot
     chat = await msg.chat.get_basic_snapshot()
@@ -151,8 +151,11 @@ def _apply_limit(messages: List[dict], max_tokens: int) -> Tuple[List[dict], int
 
 
 async def _should_reply(msg: AttrDict, chat: AttrDict) -> bool:
+    if msg.is_bot and not msg.override_sender_name:
+        return False
+
     # 1:1 direct chat
-    if chat.chat_type == const.ChatType.SINGLE:
+    if chat.chat_type == const.ChatType.SINGLE and not msg.is_bot:
         return True
 
     # mentions
