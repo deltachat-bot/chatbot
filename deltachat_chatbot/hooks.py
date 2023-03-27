@@ -162,7 +162,8 @@ async def _should_reply(msg: AttrDict, chat: AttrDict) -> bool:
     account = msg.message.account
     selfaddr = await account.get_config("configured_addr")
     displayname = await account.get_config("displayname")
-    if selfaddr in msg.text or (displayname and f"@{displayname}" in msg.text):
+    mention = displayname and msg.text.startswith(f"@{displayname}")
+    if msg.text.startswith(selfaddr) or mention:
         return True
 
     # quote-reply
