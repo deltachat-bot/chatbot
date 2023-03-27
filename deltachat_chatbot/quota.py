@@ -73,13 +73,14 @@ class QuotaManager:
         """If quota was exceeded return the cooldown, otherwise return zero"""
         tokens_quota = int(self._cfg.get("user_hourly_tokens_quota") or 0)
         queries_quota = int(self._cfg.get("user_hourly_queries_quota") or 0)
+        now = time.time()
         async with async_session() as session:
             async with session.begin():
                 stmt = select(Usage).filter_by(user_id=user_id)
                 usage = await fetchone(session, stmt)
                 if usage:
                     if usage.tokens >= tokens_quota or usage.queries >= queries_quota:
-                        return usage.ends_at
+                        return usage.ends_at - now
         return 0
 
 
