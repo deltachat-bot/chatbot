@@ -93,7 +93,7 @@ async def _filter_messages(event: AttrDict) -> None:
             return
 
         quota_exceeded = await quota_manager.quota_exceeded(msg.from_id)
-        if quota_exceeded:
+        if quota_exceeded > 0:
             cooldown = human_time_duration(quota_exceeded)
             await msg.chat.send_message(
                 text=f"Quota exceeded, wait for: ⏰ {cooldown}", quoted_msg=msg.id
