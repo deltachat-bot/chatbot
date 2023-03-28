@@ -102,7 +102,7 @@ async def _filter_messages(event: AttrDict) -> None:
 
         if quota_manager.is_rate_limited():
             await msg.chat.send_message(
-                text="I'm not available right now, try again later", quoted_msg=msg.id
+                text="⏰ I'm not available right now, try again later", quoted_msg=msg.id
             )
             return
 
