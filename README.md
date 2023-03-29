@@ -52,3 +52,6 @@ chatbot serve
 ```
 
 Run `chatbot --help` to see all available options.
+
+To change log level set the enviroment variable `CHATBOT_LOG_LEVEL` to one of:
+`debug`, `info`, `warning` or `error`

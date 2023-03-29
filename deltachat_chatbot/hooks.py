@@ -14,9 +14,9 @@ from deltabot_cli import AttrDict, Bot, BotCli, EventType, const, events
 from .openai import get_reply, init_openai
 from .orm import init as init_db
 from .quota import QuotaManager
-from .utils import human_time_duration, run_in_background
+from .utils import get_log_level, human_time_duration, run_in_background
 
-cli = BotCli("chatbot")
+cli = BotCli("chatbot", get_log_level())
 cfg: dict = {}
 quota_manager = QuotaManager(cli, {})
 
