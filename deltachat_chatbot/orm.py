@@ -7,8 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.sql.selectable import Select
 
-from .utils import get_log_level
-
 Base = declarative_base()
 _session = None  # noqa
 
@@ -36,12 +34,6 @@ def async_session():
 async def init(path: str, debug: bool = False) -> None:
     """Initialize engine."""
     global _session  # noqa
-    if get_log_level() == logging.DEBUG:
-        logging.getLogger("sqlalchemy").setLevel(logging.INFO)
-        logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
-        logging.getLogger("sqlalchemy.pool").setLevel(logging.INFO)
-        logging.getLogger("sqlalchemy.dialects").setLevel(logging.INFO)
-        logging.getLogger("sqlalchemy.orm").setLevel(logging.INFO)
     engine = create_async_engine(path, echo=debug)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
