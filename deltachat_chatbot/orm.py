@@ -38,6 +38,10 @@ async def init(path: str, debug: bool = False) -> None:
     global _session  # noqa
     if get_log_level() == logging.DEBUG:
         logging.getLogger("sqlalchemy").setLevel(logging.INFO)
+        logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+        logging.getLogger("sqlalchemy.pool").setLevel(logging.INFO)
+        logging.getLogger("sqlalchemy.dialects").setLevel(logging.INFO)
+        logging.getLogger("sqlalchemy.orm").setLevel(logging.INFO)
     engine = create_async_engine(path, echo=debug)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
