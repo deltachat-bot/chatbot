@@ -76,9 +76,7 @@ async def _filter_messages(event: AttrDict) -> None:
     if not msg.text or not await _should_reply(msg, chat):
         return
 
-    message, prompt_tokens = await _get_message(msg)
-    messages = [message]
-
+    messages, prompt_tokens = await _get_messages(msg)
     if not messages:
         await msg.chat.send_message(text="TL;DR", quoted_msg=msg.id)
     else:
@@ -118,7 +116,7 @@ async def _filter_messages(event: AttrDict) -> None:
             quota_manager.set_rate_limit(60)
 
 
-async def _get_message(msg: AttrDict) -> List[dict]:
+async def _get_messages(msg: AttrDict) -> Tuple[List[dict], int]:
     text = ""
     if msg.quote and msg.quote.text:
         text = "> " + msg.quote.text.replace("\n", "\n> ") + "\n\n"
@@ -127,11 +125,11 @@ async def _get_message(msg: AttrDict) -> List[dict]:
     prompt_tokens = 0
     if max_tokens:
         enc = tiktoken.encoding_for_model(cfg["openai"].get("model"))
-        for msg in (text + msg.text, msg.text):
-            tokens = len(enc.encode(msg))
+        for text2 in (text + msg.text, msg.text):
+            tokens = len(enc.encode(text2))
             if tokens <= max_tokens // 2:
                 prompt_tokens = tokens
-                text = msg
+                text = text2
                 break
         else:
             text = ""
