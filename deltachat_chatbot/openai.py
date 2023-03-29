@@ -1,4 +1,6 @@
 """Interaction with OpenAI API"""
+import logging
+
 import openai
 from openai.openai_object import OpenAIObject
 
@@ -16,4 +18,6 @@ async def get_reply(user: str, messages: list, max_tokens: int) -> OpenAIObject:
     if max_tokens:
         kwargs["max_tokens"] = max_tokens
     kwargs.setdefault("messages", []).extend(messages)
-    return await openai.ChatCompletion.acreate(**kwargs, user=user)
+    kwargs["user"] = user
+    logging.debug("user message: %s", kwargs)
+    return await openai.ChatCompletion.acreate(**kwargs)
