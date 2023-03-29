@@ -110,6 +110,7 @@ async def _filter_messages(event: AttrDict) -> None:
             reply = await get_reply(
                 str(msg.from_id), messages, max_tokens - prompt_tokens
             )
+            logging.debug("bot reply: %s", reply)
             await quota_manager.increase_usage(msg.from_id, reply.usage.total_tokens)
             text = reply.choices[0].message.content.strip()
             await msg.chat.send_message(text=text, quoted_msg=msg.id)
