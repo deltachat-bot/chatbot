@@ -1,5 +1,4 @@
 """database"""
-import logging
 from typing import Any
 
 from sqlalchemy import Column, Integer
