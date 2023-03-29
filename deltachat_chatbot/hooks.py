@@ -76,10 +76,8 @@ async def _filter_messages(event: AttrDict) -> None:
     if not msg.text or not await _should_reply(msg, chat):
         return
 
-    messages = await _get_messages(msg)
-    max_tokens = int(cfg["openai"].get("max_tokens") or 0)
-    if max_tokens:
-        messages, prompt_tokens = _apply_limit(messages, max_tokens)
+    message, prompt_tokens = await _get_message(msg)
+    messages = [message]
 
     if not messages:
         await msg.chat.send_message(text="TL;DR", quoted_msg=msg.id)
@@ -107,6 +105,7 @@ async def _filter_messages(event: AttrDict) -> None:
             return
 
         try:
+            max_tokens = int(cfg["openai"].get("max_tokens") or 0)
             reply = await get_reply(
                 str(msg.from_id), messages, max_tokens - prompt_tokens
             )
@@ -119,25 +118,25 @@ async def _filter_messages(event: AttrDict) -> None:
             quota_manager.set_rate_limit(60)
 
 
-async def _get_messages(msg: AttrDict) -> List[dict]:
+async def _get_message(msg: AttrDict) -> List[dict]:
     text = ""
     if msg.quote and msg.quote.text:
         text = "> " + msg.quote.text.replace("\n", "\n> ") + "\n\n"
-    return [{"role": "user", "content": text + msg.text}]
 
-
-def _apply_limit(messages: List[dict], max_tokens: int) -> Tuple[List[dict], int]:
-    enc = tiktoken.encoding_for_model(cfg["openai"].get("model"))
+    max_tokens = int(cfg["openai"].get("max_tokens") or 0)
     prompt_tokens = 0
-    msgs: List[dict] = []
-    for message in reversed(messages):
-        tokens = len(enc.encode(message["content"]))
-        if prompt_tokens + tokens <= max_tokens // 2:
-            prompt_tokens += tokens
-            msgs.insert(0, message)
+    if max_tokens:
+        enc = tiktoken.encoding_for_model(cfg["openai"].get("model"))
+        for msg in (text + msg.text, msg.text):
+            tokens = len(enc.encode(msg))
+            if tokens <= max_tokens // 2:
+                prompt_tokens = tokens
+                text = msg
+                break
         else:
-            break
-    return msgs, prompt_tokens
+            text = ""
+
+    return [{"role": "user", "content": text}] if text else [], prompt_tokens
 
 
 async def _should_reply(msg: AttrDict, chat: AttrDict) -> bool:
