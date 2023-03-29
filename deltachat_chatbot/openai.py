@@ -1,4 +1,5 @@
 """Interaction with OpenAI API"""
+import copy
 import logging
 
 import openai
@@ -14,7 +15,7 @@ async def init_openai(api_key: str, config: dict) -> None:
 
 
 async def get_reply(user: str, messages: list, max_tokens: int) -> OpenAIObject:
-    kwargs = _cfg.copy()
+    kwargs = copy.deepcopy(_cfg)
     if max_tokens:
         kwargs["max_tokens"] = max_tokens
     kwargs.setdefault("messages", []).extend(messages)
