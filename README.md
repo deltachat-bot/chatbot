@@ -35,7 +35,9 @@ Create a configuration file named `config.json` in the program folder, for examp
   "user_hourly_queries_quota": 60,
   "openai": {
     "model": "gpt-3.5-turbo",
-    "max_tokens": 500
+    "max_tokens": 500,
+    "messages": [{"role": "system", "content": "You are a helpful assistant inside Delta Chat messenger."}],
+    "temperature": 0.7
   }
 }
 ```

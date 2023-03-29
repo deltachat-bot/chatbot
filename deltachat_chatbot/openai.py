@@ -15,8 +15,5 @@ async def get_reply(user: str, messages: list, max_tokens: int) -> OpenAIObject:
     kwargs = _cfg.copy()
     if max_tokens:
         kwargs["max_tokens"] = max_tokens
-    return await openai.ChatCompletion.acreate(
-        **kwargs,
-        user=user,
-        messages=messages,
-    )
+    kwargs.setdefault("messages", []).extend(messages)
+    return await openai.ChatCompletion.acreate(**kwargs, user=user)
