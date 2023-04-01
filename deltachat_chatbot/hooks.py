@@ -19,6 +19,7 @@ from .utils import get_log_level, human_time_duration, run_in_background
 cli = BotCli("chatbot", get_log_level())
 cfg: dict = {}
 quota_manager = QuotaManager(cli, {})
+fail_count = 5
 
 
 @cli.on_init
@@ -111,9 +112,15 @@ async def _filter_messages(event: AttrDict) -> None:
             await quota_manager.increase_usage(msg.from_id, reply.usage.total_tokens)
             text = reply.choices[0].message.content.strip()
             await msg.chat.send_message(text=text, quoted_msg=msg.id)
+            fail_count = 5
             await asyncio.sleep(1)  # avoid rate limits
-        except openai.error.RateLimitError:
-            quota_manager.set_rate_limit(60)
+        except openai.error.RateLimitError as ex:
+            logging.exception(ex)
+            await msg.chat.send_message(
+                text="⏰ I'm not available right now, try again later", quoted_msg=msg.id
+            )
+            fail_count = max(fail_count + 1, 60)
+            quota_manager.set_rate_limit(60 * fail_count)
 
 
 async def _get_messages(msg: AttrDict) -> Tuple[List[dict], int]:
