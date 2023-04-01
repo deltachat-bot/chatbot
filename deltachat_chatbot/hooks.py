@@ -19,7 +19,7 @@ from .utils import get_log_level, human_time_duration, run_in_background
 cli = BotCli("chatbot", get_log_level())
 cfg: dict = {}
 quota_manager = QuotaManager(cli, {})
-fail_count = 5
+fail_count = 5  # pylint:disable=C0103
 
 
 @cli.on_init
@@ -72,6 +72,7 @@ async def _member_added(event: AttrDict) -> None:
 
 @cli.on(events.NewMessage(is_info=False, func=cli.is_not_known_command))
 async def _filter_messages(event: AttrDict) -> None:
+    global fail_count  # pylint:disable=C0103
     msg = event.message_snapshot
     chat = await msg.chat.get_basic_snapshot()
     if not msg.text or not await _should_reply(msg, chat):
