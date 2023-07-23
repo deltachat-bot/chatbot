@@ -113,14 +113,14 @@ async def _filter_messages(event: AttrDict) -> None:
             await quota_manager.increase_usage(msg.from_id, reply.usage.total_tokens)
             text = reply.choices[0].message.content.strip()
             await msg.chat.send_message(text=text, quoted_msg=msg.id)
-            fail_count = 5
+            fail_count = 2
             await asyncio.sleep(1)  # avoid rate limits
         except openai.error.RateLimitError as ex:
             logging.exception(ex)
             await msg.chat.send_message(
                 text="⏰ I'm not available right now, try again later", quoted_msg=msg.id
             )
-            fail_count = max(fail_count + 1, 60)
+            fail_count = min(fail_count + 1, 60)
             quota_manager.set_rate_limit(60 * fail_count)
 
 
