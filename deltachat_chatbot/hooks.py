@@ -1,168 +1,176 @@
 """Event Hooks"""
-# pylama:ignore=W0603
-import asyncio
-import json
-import logging
-import os
+
+import time
 from argparse import Namespace
-from typing import List, Tuple
+from typing import List
 
-import openai
-import tiktoken
-from deltabot_cli import AttrDict, Bot, BotCli, EventType, const, events
+from deltabot_cli import BotCli
+from deltachat2 import (
+    Bot,
+    ChatType,
+    CoreEvent,
+    EventType,
+    Message,
+    MsgData,
+    NewMsgEvent,
+    SpecialContactId,
+    events,
+)
+from rich.logging import RichHandler
 
-from .openai import get_reply, init_openai
-from .orm import init as init_db
-from .quota import QuotaManager
-from .utils import get_log_level, human_time_duration, run_in_background
+from .gpt4all import GPT4All
 
-cli = BotCli("chatbot", get_log_level())
-cfg: dict = {}
-quota_manager = QuotaManager(cli, {})
-fail_count = 5  # pylint:disable=C0103
+cli = BotCli("chatbot")
+cli.add_generic_option(
+    "--no-time",
+    help="do not display date timestamp in log messages",
+    action="store_false",
+)
+cli.add_generic_option(
+    "--model",
+    help="gpt4all model to use (default: %(default)s)",
+    default="mistral-7b-openorca.gguf2.Q4_0.gguf",
+)
+cli.add_generic_option("--system-prompt", help="an initial instruction for the model")
+cli.add_generic_option(
+    "--max-tokens",
+    help="the maximum number of tokens to generate (default: %(default)s)",
+    default=200,
+    type=int,
+)
+cli.add_generic_option(
+    "--history",
+    help="the maximum number replies to rember (default: %(default)s)",
+    default=20,
+    type=int,
+)
+cli.add_generic_option(
+    "--temperature",
+    help="the model temperature. Larger values increase creativity but decrease factuality."
+    " (default: %(default)s)",
+    default=0.5,
+    type=float,
+)
+
+gpt4all: GPT4All = None
+args = Namespace()
 
 
 @cli.on_init
-async def on_init(bot: Bot, _args: Namespace) -> None:
-    if not await bot.account.get_config("displayname"):
-        await bot.account.set_config("displayname", "ChatBot")
-        status = "I am a conversational Delta Chat bot, you can chat with me in private"
-        await bot.account.set_config("selfstatus", status)
+def on_init(bot: Bot, opts: Namespace) -> None:
+    bot.logger.handlers = [
+        RichHandler(show_path=False, omit_repeated_times=False, show_time=opts.no_time)
+    ]
+    for accid in bot.rpc.get_all_account_ids():
+        if not bot.rpc.get_config(accid, "displayname"):
+            bot.rpc.set_config(accid, "displayname", "ChatBot")
+            status = "I am a conversational bot, you can chat with me in private"
+            bot.rpc.set_config(accid, "selfstatus", status)
 
 
 @cli.on_start
-async def _on_start(bot: Bot, args: Namespace) -> None:
-    global quota_manager  # pylint:disable=C0103
-    path = os.path.join(args.config_dir, "config.json")
-    if os.path.exists(path):
-        with open(path, encoding="utf-8") as config:
-            cfg.update(json.load(config))
-    cfg["openai"] = {"model": "gpt-3.5-turbo", "n": 1, **(cfg.get("openai") or {})}
-    api_key = cfg.get("api_key", "")
-    assert api_key, "API key is not set"
-    await init_openai(api_key, cfg["openai"])
-
-    path = os.path.join(args.config_dir, "sqlite.db")
-    await init_db(f"sqlite+aiosqlite:///{path}")
-
-    quota_manager = QuotaManager(cli, cfg)
-    run_in_background(quota_manager.cooldown_loop())
-    logging.info(
-        "Listening for messages at: %s", await bot.account.get_config("configured_addr")
-    )
+def on_start(_bot: Bot, opts: Namespace) -> None:
+    global gpt4all, args  # noqa
+    args = opts
+    gpt4all = GPT4All(args.model)
 
 
 @cli.on(events.RawEvent)
-async def log_event(event: AttrDict) -> None:
-    if event.type == EventType.INFO:
-        logging.info(event.msg)
-    elif event.type == EventType.WARNING:
-        logging.warning(event.msg)
-    elif event.type == EventType.ERROR:
-        logging.error(event.msg)
+def log_event(bot: Bot, accid: int, event: CoreEvent) -> None:
+    if event.kind == EventType.INFO:
+        bot.logger.debug(event.msg)
+    elif event.kind == EventType.WARNING:
+        bot.logger.warning(event.msg)
+    elif event.kind == EventType.ERROR:
+        bot.logger.error(event.msg)
+    elif event.kind == EventType.SECUREJOIN_INVITER_PROGRESS:
+        if event.progress == 1000:
+            if not bot.rpc.get_contact(accid, event.contact_id).is_bot:
+                bot.logger.debug("QR scanned by contact id=%s", event.contact_id)
+                chatid = bot.rpc.create_chat_by_contact_id(accid, event.contact_id)
+                send_help(bot, accid, chatid)
 
 
-@cli.on(events.MemberListChanged(added=True))
-async def _member_added(event: AttrDict) -> None:
-    msg = event.message_snapshot
-    account = msg.message.account
-    if event.member == await account.get_config("configured_addr"):
-        await msg.chat.send_text("👋")
+@cli.on(events.NewMessage(command="/help"))
+def _help(bot: Bot, accid: int, event: NewMsgEvent) -> None:
+    bot.rpc.markseen_msgs(accid, [event.msg.id])
+    send_help(bot, accid, event.msg.chat_id)
 
 
-@cli.on(events.NewMessage(is_info=False, func=cli.is_not_known_command))
-async def _filter_messages(event: AttrDict) -> None:
-    global fail_count  # pylint:disable=C0103
-    msg = event.message_snapshot
-    chat = await msg.chat.get_basic_snapshot()
-    if not msg.text or not await _should_reply(msg, chat):
+@cli.on(events.NewMessage(command="/clear"))
+def _clear(bot: Bot, accid: int, event: NewMsgEvent) -> None:
+    bot.rpc.markseen_msgs(accid, [event.msg.id])
+    bot.rpc.delete_chat(accid, event.msg.chat_id)
+
+
+@cli.on(events.NewMessage(is_info=False))
+def on_message(bot: Bot, accid: int, event: NewMsgEvent) -> None:
+    if bot.has_command(event.command):
         return
 
-    messages, prompt_tokens = await _get_messages(msg)
-    if not messages:
-        await msg.chat.send_message(text="TL;DR", quoted_msg=msg.id)
-    else:
-        global_quota_exceeded = await quota_manager.global_quota_exceeded()
-        if global_quota_exceeded:
-            cooldown = human_time_duration(await quota_manager.get_global_cooldown())
-            await msg.chat.send_message(
-                text=f"Quota exceeded, wait for: ⏰ {cooldown}", quoted_msg=msg.id
-            )
-            return
+    msg = event.msg
+    chat = bot.rpc.get_basic_chat_info(accid, msg.chat_id)
+    if chat.chat_type != ChatType.SINGLE:
+        return
 
-        quota_exceeded = await quota_manager.quota_exceeded(msg.from_id)
-        if quota_exceeded > 0:
-            cooldown = human_time_duration(quota_exceeded)
-            await msg.chat.send_message(
-                text=f"Quota exceeded, wait for: ⏰ {cooldown}", quoted_msg=msg.id
-            )
-            return
+    bot.rpc.markseen_msgs(accid, [msg.id])
 
-        if quota_manager.is_rate_limited():
-            await msg.chat.send_message(
-                text="⏰ I'm not available right now, try again later", quoted_msg=msg.id
-            )
-            return
+    if not msg.text:
+        send_help(bot, accid, msg.chat_id)
+        return
 
-        try:
-            max_tokens = int(cfg["openai"].get("max_tokens") or 0)
-            reply = await get_reply(
-                str(msg.from_id), messages, max_tokens - prompt_tokens
-            )
-            logging.debug("bot reply: %s", reply)
-            await quota_manager.increase_usage(msg.from_id, reply.usage.total_tokens)
-            text = reply.choices[0].message.content.strip()
-            await msg.chat.send_message(text=text, quoted_msg=msg.id)
-            fail_count = 2
-            await asyncio.sleep(1)  # avoid rate limits
-        except openai.error.RateLimitError as ex:
-            logging.exception(ex)
-            await msg.chat.send_message(
-                text="⏰ I'm not available right now, try again later", quoted_msg=msg.id
-            )
-            fail_count = min(fail_count + 1, 60)
-            quota_manager.set_rate_limit(60 * fail_count)
+    with gpt4all.chat_session(system_prompt=args.system_prompt or None):
+        bot.logger.debug(f"[chat={msg.chat_id}] Processing message={msg.id}")
+        load_history(bot, accid, msg.chat_id)
+
+        start = time.time()
+        text = gpt4all.generate(
+            msg.text, max_tokens=args.max_tokens, temp=args.temperature
+        )
+        text = text.strip() or "😶"
+        took = time.time() - start
+        bot.logger.debug(f"[chat={msg.chat_id}] Generated reply in {took:.1f} seconds")
+
+    bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=text, quoted_message_id=msg.id))
 
 
-async def _get_messages(msg: AttrDict) -> Tuple[List[dict], int]:
-    text = ""
-    if msg.quote and msg.quote.text:
-        text = "> " + msg.quote.text.replace("\n", "\n> ") + "\n\n"
-
-    max_tokens = int(cfg["openai"].get("max_tokens") or 0)
-    prompt_tokens = 0
-    if max_tokens:
-        enc = tiktoken.encoding_for_model(cfg["openai"].get("model"))
-        for text2 in (text + msg.text, msg.text):
-            tokens = len(enc.encode(text2))
-            if tokens <= max_tokens // 2:
-                prompt_tokens = tokens
-                text = text2
-                break
-        else:
-            text = ""
-
-    return [{"role": "user", "content": text}] if text else [], prompt_tokens
+@cli.after(events.NewMessage)
+def delete_msgs(bot: Bot, accid: int, event: NewMsgEvent) -> None:
+    if event.command != "/clear":  # /clear deletes the whole chat
+        msg = event.msg
+        bot.rpc.delete_messages(accid, [msg.id])
+        bot.logger.debug(f"[chat={msg.chat_id}] Deleted message={msg.id}")
 
 
-async def _should_reply(msg: AttrDict, chat: AttrDict) -> bool:
-    # 1:1 direct chat
-    if chat.chat_type == const.ChatType.SINGLE:
-        return True
+def load_history(bot: Bot, accid: int, chatid: int) -> None:
+    to_process: List[Message] = []
+    to_delete: List[int] = []
+    for msgid in reversed(bot.rpc.get_message_ids(accid, chatid, False, False)):
+        oldmsg = bot.rpc.get_message(accid, msgid)
+        if oldmsg.from_id == SpecialContactId.SELF:
+            if len(to_process) >= args.history:
+                to_delete.append(msgid)
+            else:
+                to_process.append(oldmsg)
 
-    # mentions
-    account = msg.message.account
-    selfaddr = await account.get_config("configured_addr")
-    displayname = await account.get_config("displayname")
-    mention = displayname and msg.text.startswith(f"@{displayname}")
-    if msg.text.startswith(selfaddr) or mention:
-        return True
+    if to_delete:
+        bot.rpc.delete_messages(accid, to_delete)
 
-    # quote-reply
-    if msg.quote and msg.quote.get("message_id"):
-        quote = account.get_message_by_id(msg.quote.message_id)
-        snapshot = await quote.get_snapshot()
-        if snapshot.sender == account.self_contact:
-            return True
+    start = time.time()
+    for oldmsg in reversed(to_process):
+        prompt = oldmsg.quote.text if oldmsg.quote else ""
+        gpt4all.generate(prompt, max_tokens=0, fake_reply=oldmsg.text)
+    took = time.time() - start
+    bot.logger.debug(
+        f"[chat={chatid}] Loaded {len(to_process)} entries of history in {took:.1f} seconds"
+    )
 
-    return False
+
+def send_help(bot: Bot, accid: int, chatid: int) -> None:
+    lines = [
+        "👋 I am a conversational bot and you can chat with me in private only.",
+        "No 3rd party service is involved, only I will have access to the messages you send to me.",
+        'To control our chat history, you should set "Disappearing Messages" in this chat.',
+        "Alternatively, send /clear and I will forget all the messages I have received here",
+    ]
+    bot.rpc.send_msg(accid, chatid, MsgData(text="\n".join(lines)))

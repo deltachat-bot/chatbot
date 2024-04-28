@@ -1,32 +1,29 @@
 [build-system]
-requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "deltachat-chatbot"
 description = "Conversational chat-bot for Delta Chat"
+dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.8"
-license = {file = "LICENSE.txt"}
-keywords = ["deltachat", "bot"]
+keywords = ["deltachat", "bot", "chatbot", "ai"]
 authors = [
-  {email = "adbenitez@hispanilandia.net"},
-  {name = "adbenitez"}
+  {name = "adbenitez", email = "adb@merlinux.eu"},
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
-  "Programming Language :: Python"
-]
-dynamic = [
-    "version"
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 ]
 dependencies = [
-    "SQLAlchemy>=1.4.44",
-    "aiosqlite>=0.17.0",
-    "openai>=0.27.2",
-    "tiktoken>=0.3.2",
-    "deltabot-cli @ git+https://github.com/deltachat-bot/deltabot-cli-py.git",
+    "deltabot-cli>=6.0.0,<7.0",
+    "gpt4all>=2.6.0,<3.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/deltachat-bot/chatbot"
 
 [project.optional-dependencies]
 dev = [
@@ -40,6 +37,9 @@ dev = [
 
 [project.scripts]
 chatbot = "deltachat_chatbot:main"
+
+[tool.setuptools_scm]
+# can be empty if no extra settings are needed, presence enables setuptools_scm
 
 [tool.isort]
 profile = "black"
