@@ -1,4 +1,6 @@
 # pylama:ignore=C0114,W0212,R0913,R0914,C0301,R1735,
+from __future__ import annotations
+
 import ctypes
 import warnings
 from typing import Any
