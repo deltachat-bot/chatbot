@@ -35,7 +35,7 @@ cli.add_generic_option("--system-prompt", help="an initial instruction for the m
 cli.add_generic_option(
     "--max-tokens",
     help="the maximum number of tokens to generate (default: %(default)s)",
-    default=200,
+    default=500,
     type=int,
 )
 cli.add_generic_option(
