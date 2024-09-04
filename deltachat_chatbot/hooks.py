@@ -119,6 +119,7 @@ def on_message(bot: Bot, accid: int, event: NewMsgEvent) -> None:
         send_help(bot, accid, msg.chat_id)
         return
 
+    bot.rpc.send_reaction(accid, msg.id, ["⏳"])
     with gpt4all.chat_session(system_prompt=args.system_prompt or None):
         bot.logger.debug(f"[chat={msg.chat_id}] Processing message={msg.id}")
         load_history(bot, accid, msg.chat_id)
@@ -131,6 +132,7 @@ def on_message(bot: Bot, accid: int, event: NewMsgEvent) -> None:
         took = time.time() - start
         bot.logger.debug(f"[chat={msg.chat_id}] Generated reply in {took:.1f} seconds")
 
+    bot.rpc.send_reaction(accid, msg.id, [])
     bot.rpc.send_msg(accid, msg.chat_id, MsgData(text=text, quoted_message_id=msg.id))
 
 
