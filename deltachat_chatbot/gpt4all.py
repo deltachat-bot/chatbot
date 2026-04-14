@@ -51,12 +51,12 @@ def prompt_model(
     """
 
     if self.model is None:
-        self._raise_closed()
+        self._raise_closed()  # noqa
 
     self.buffer.clear()
     self.buff_expecting_cont_bytes = 0
 
-    self._set_context(
+    self._set_context(  # noqa
         n_predict=n_predict,
         top_k=top_k,
         top_p=top_p,
@@ -73,8 +73,8 @@ def prompt_model(
         self.model,
         ctypes.c_char_p(prompt.encode()),
         ctypes.c_char_p(prompt_template.encode()),
-        PromptCallback(self._prompt_callback),
-        ResponseCallback(self._callback_decoder(callback)),
+        PromptCallback(self._prompt_callback),  # noqa
+        ResponseCallback(self._callback_decoder(callback)),  # noqa
         True,
         self.context,
         special,
@@ -130,17 +130,17 @@ class GPT4All(_GPT4All):
         """
 
         # Preparing the model request
-        generate_kwargs: dict[str, Any] = dict(
-            temp=temp,
-            top_k=top_k,
-            top_p=top_p,
-            min_p=min_p,
-            repeat_penalty=repeat_penalty,
-            repeat_last_n=repeat_last_n,
-            n_batch=n_batch,
-            n_predict=n_predict if n_predict is not None else max_tokens,
-            fake_reply=fake_reply,
-        )
+        generate_kwargs: dict[str, Any] = {
+            "temp": temp,
+            "top_k": top_k,
+            "top_p": top_p,
+            "min_p": min_p,
+            "repeat_penalty": repeat_penalty,
+            "repeat_last_n": repeat_last_n,
+            "n_batch": n_batch,
+            "n_predict": n_predict if n_predict is not None else max_tokens,
+            "fake_reply": fake_reply,
+        }
 
         if self._history is not None:
             # check if there is only one message, i.e. system prompt:
@@ -193,7 +193,7 @@ class GPT4All(_GPT4All):
             output_collector: list[MessageType],
         ) -> ResponseCallbackType:
             def _callback(token_id: int, response: str) -> bool:
-                nonlocal callback, output_collector
+                nonlocal callback, output_collector  # noqa
 
                 output_collector[-1]["content"] += response
 

@@ -52,7 +52,7 @@ cli.add_generic_option(
     type=float,
 )
 
-gpt4all: GPT4All = None
+gpt4all: GPT4All = None  # noqa
 args = Namespace()
 
 
