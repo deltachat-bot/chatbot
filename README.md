@@ -17,7 +17,7 @@ pip install deltachat-chatbot
 Configure the bot:
 
 ```sh
-chatbot init bot@example.com PASSWORD
+chatbot init dcaccount:nine.testrun.org
 ```
 
 Start the bot:
